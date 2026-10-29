@@ -1,0 +1,10 @@
+[package]
+name = "pulsenet/pulsenet"
+description = "High-performance batched, buffer-accelerated networking library for Roblox (Luau)"
+version = "1.0.0"
+registry = "https://github.com/Uplift-Games/wally-index"
+realm = "shared"
+license = "MIT"
+authors = ["PulseNet Contributors"]
+
+[dependencies]

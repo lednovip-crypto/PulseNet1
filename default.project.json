@@ -1,0 +1,12 @@
+{
+  "name": "PulseNet",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "PulseNet": {
+        "$path": "src"
+      }
+    }
+  }
+}
