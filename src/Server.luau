@@ -1,8 +1,8 @@
 --!strict
 --!optimize 2
 --[=[
-    PulseNet Server
-    Manages batched RemoteEvents, rate limiting, and network synchronization on the Roblox Server.
+    PulseNet Server v1.1.0
+    Integrated with SecurityGuard Anti-DDoS and Payload Firewall.
 ]=]
 
 local RunService = game:GetService("RunService")
@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 
 local Signal = require(script.Parent.Signal)
 local RateLimiter = require(script.Parent.RateLimiter)
+local SecurityGuard = require(script.Parent.SecurityGuard)
 
 export type Middleware = (player: Player, channel: string, data: any) -> boolean
 
@@ -51,6 +52,7 @@ function Server.new(parentFolder: Instance?)
 		_outgoingReliable = {} :: { [Player]: { { channel: string, data: any } } },
 		_outgoingUnreliable = {} :: { [Player]: { { channel: string, data: any } } },
 		_rateLimiter = RateLimiter.new(60, 30), -- 60 burst, 30/sec
+		_securityGuard = SecurityGuard.new(),  -- Anti-DDoS & Payload Firewall
 		_middlewares = {} :: { Middleware },
 		_heartbeatConn = nil :: RBXScriptConnection?,
 	}, Server)
@@ -74,18 +76,33 @@ function Server:_initListeners()
 		self._rateLimiter:Reset(player)
 	end)
 
-	-- Flush batches every Heartbeat
+	-- Flush batches every Heartbeat frame
 	self._heartbeatConn = RunService.Heartbeat:Connect(function()
 		self:_flush()
 	end)
 end
 
 function Server:_handleIncoming(player: Player, batch: any)
-	if type(batch) ~= "table" then return end
+	-- 1. Проверка на теневой бан (DDoS фильтр)
+	if self._securityGuard:IsPlayerBlocked(player) then
+		return
+	end
 
-	-- Check rate limit
+	if type(batch) ~= "table" then
+		self._securityGuard:RecordViolation(player)
+		return
+	end
+
+	-- 2. Валидация размера пакета и вредоносных структур
+	if not self._securityGuard:ValidateData(batch) then
+		self._securityGuard:RecordViolation(player)
+		return
+	end
+
+	-- 3. Проверка лимита частоты пакетов
 	if not self._rateLimiter:Check(player, #batch) then
-		warn(string.format("[PulseNet] Player %s exceeded packet rate limit!", player.Name))
+		self._securityGuard:RecordViolation(player)
+		warn(string.format("[PulseNet] Player %s throttled due to excessive packet burst", player.Name))
 		return
 	end
 
@@ -144,7 +161,6 @@ function Server:FireExcept(exceptPlayer: Player, channel: string, data: any, unr
 end
 
 function Server:_flush()
-	-- Flush reliable batches
 	for player, batch in pairs(self._outgoingReliable) do
 		if #batch > 0 then
 			self._reliableRemote:FireClient(player, batch)
@@ -152,7 +168,6 @@ function Server:_flush()
 		end
 	end
 
-	-- Flush unreliable batches
 	for player, batch in pairs(self._outgoingUnreliable) do
 		if #batch > 0 then
 			self._unreliableRemote:FireClient(player, batch)
@@ -167,6 +182,7 @@ function Server:Destroy()
 		self._heartbeatConn = nil
 	end
 	self._rateLimiter:Destroy()
+	self._securityGuard:Destroy()
 	table.clear(self._channels)
 	table.clear(self._outgoingReliable)
 	table.clear(self._outgoingUnreliable)
