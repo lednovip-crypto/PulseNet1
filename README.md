@@ -103,7 +103,7 @@ end)
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome!  
-Feel free to check out the [issues page](https://github.com/Feel free to check out the [issues page](https://github.com/lednovip-crypto/PulseNet1/issues).
+Feel free to check out the [issues page](https://github.com/lednovip-crypto/PulseNet1/issues).
 
 ---
 
